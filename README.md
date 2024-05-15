@@ -1,2 +1,2 @@
 # my_aiogram_telegram_bot
-Telegram bot using iogram
+Telegram bot using aiogram
