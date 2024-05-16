@@ -1,20 +1,21 @@
 import logging
 import os
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.middlewares.logging import LoggingMiddleware
-from aiogram.dispatcher.filters import Command
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.utils import executor
+from aiogram.filters import Command
 import openai
 import asyncio
+import httpx
+from openai import AsyncOpenAI
 
 # Загрузка переменных окружения
 load_dotenv()
 
-API_TOKEN = os.getenv('TELEGRAM_API_TOKEN')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-ALLOWED_USERS = os.getenv('ALLOWED_USERS').split(',')
+API_TOKEN = os.getenv('TG_TOKEN')
+OPENAI_API_KEY = os.getenv('AI_TOKEN')
+# ALLOWED_USERS = os.getenv('ALLOWED_USERS').split(',')
+STOP_LIST = []
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
-dp.middleware.setup(LoggingMiddleware())
+dp = Dispatcher()
+router = Router()
 
 # Установка API ключа OpenAI
 openai.api_key = OPENAI_API_KEY
@@ -37,10 +38,29 @@ class UserState:
         self.questions = []
         self.stage = 0
 
+client = AsyncOpenAI(api_key=os.getenv('AI_TOKEN'),
+                     http_client=httpx.AsyncClient(
+                         proxies=os.getenv('PROXY'),
+                         transport=httpx.HTTPTransport(local_address="0.0.0.0")
+                     ))
+
+
+# Настройка HTTP-клиента с использованием прокси
+async def get_chatgpt_response(user_state: UserState):
+    conversation = user_state.start_prompt + "\n".join([f"Q: {q}\nA: {a}" for q, a in zip(user_state.questions, user_state.answers)])
+    response = await client.chat.completions.create(
+        messages=[{"role": "user",
+               "content": str(conversation)}],
+        model="gpt-4o"
+    )
+    return response.choices[0].message.content
+
+
 async def start_dialogue(message: types.Message, user_state: UserState):
     if user_state.stage == 0:
-        await message.answer("Начнём диалог! Первый вопрос: Какой ваш любимый фильм?")
-        user_state.questions.append("Какой ваш любимый фильм?")
+        first_question = "Какой ваш любимый фильм?"
+        await message.answer(first_question)
+        user_state.questions.append(first_question)
         user_state.stage += 1
     else:
         user_state.answers.append(message.text)
@@ -59,25 +79,16 @@ async def send_options(message: types.Message):
     keyboard.add(InlineKeyboardButton("Новый диалог", callback_data="new_dialog"))
     await message.answer("Выберите действие:", reply_markup=keyboard)
 
-async def get_chatgpt_response(user_state: UserState):
-    conversation = user_state.start_prompt + "\n".join([f"Q: {q}\nA: {a}" for q, a in zip(user_state.questions, user_state.answers)])
-    response = openai.Completion.create(
-        model="text-davinci-004",
-        prompt=conversation,
-        max_tokens=100
-    )
-    return response.choices[0].text.strip()
-
-@dp.message_handler(Command('start'))
+@router.message(Command('start'))
 async def cmd_start(message: types.Message):
-    if message.from_user.username in ALLOWED_USERS:
+    if message.from_user.username not in STOP_LIST:
         user_state = UserState("Это начальный промпт.\n")
         user_states[message.from_user.id] = user_state
         await start_dialogue(message, user_state)
     else:
         await message.answer("Вы не имеете доступа к этому боту.")
 
-@dp.message_handler()
+@router.message()
 async def process_message(message: types.Message):
     user_id = message.from_user.id
     if user_id in user_states:
@@ -86,7 +97,7 @@ async def process_message(message: types.Message):
     else:
         await message.answer("Используйте команду /start для начала диалога.")
 
-@dp.callback_query_handler(lambda c: c.data == 'new_dialog')
+@router.callback_query(lambda c: c.data == 'new_dialog')
 async def process_callback_new_dialog(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     if user_id in user_states:
@@ -97,5 +108,9 @@ async def process_callback_new_dialog(callback_query: types.CallbackQuery):
         await start_dialogue(callback_query.message, user_state)
     await bot.answer_callback_query(callback_query.id)
 
+async def main():
+    dp.include_router(router)
+    await dp.start_polling(bot)
+
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
