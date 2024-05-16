@@ -4,7 +4,12 @@ import httpx
 from openai import AsyncOpenAI
 
 
-client = AsyncOpenAI(api_key=os.getenv('AI_TOKEN'))
+load_dotenv()
+client = AsyncOpenAI(api_key=os.getenv('AI_TOKEN'),
+                     http_client=httpx.AsyncClient(
+                         proxies=os.getenv('PROXY'),
+                         transport=httpx.HTTPTransport(local_address="0.0.0.0")
+                     ))
 
 
 async def gpt4(question):
