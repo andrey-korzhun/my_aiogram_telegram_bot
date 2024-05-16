@@ -1,1 +1,1 @@
-worker: python good_var_1.py
+worker: python main.py
