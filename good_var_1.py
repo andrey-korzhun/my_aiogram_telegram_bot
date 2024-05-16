@@ -6,8 +6,6 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 import openai
 import asyncio
-import httpx
-from openai import AsyncOpenAI
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -38,24 +36,6 @@ class UserState:
         self.questions = []
         self.stage = 0
 
-client = AsyncOpenAI(api_key=os.getenv('AI_TOKEN'),
-                     http_client=httpx.AsyncClient(
-                         proxies=os.getenv('PROXY'),
-                         transport=httpx.HTTPTransport(local_address="0.0.0.0")
-                     ))
-
-
-# Настройка HTTP-клиента с использованием прокси
-async def get_chatgpt_response(user_state: UserState):
-    conversation = user_state.start_prompt + "\n".join([f"Q: {q}\nA: {a}" for q, a in zip(user_state.questions, user_state.answers)])
-    response = await client.chat.completions.create(
-        messages=[{"role": "user",
-               "content": str(conversation)}],
-        model="gpt-4o"
-    )
-    return response.choices[0].message.content
-
-
 async def start_dialogue(message: types.Message, user_state: UserState):
     if user_state.stage == 0:
         first_question = "Какой ваш любимый фильм?"
@@ -78,6 +58,15 @@ async def send_options(message: types.Message):
     keyboard.add(InlineKeyboardButton("Ссылка 2", url="https://example.com/2"))
     keyboard.add(InlineKeyboardButton("Новый диалог", callback_data="new_dialog"))
     await message.answer("Выберите действие:", reply_markup=keyboard)
+
+async def get_chatgpt_response(user_state: UserState):
+    conversation = user_state.start_prompt + "\n".join([f"Q: {q}\nA: {a}" for q, a in zip(user_state.questions, user_state.answers)])
+    response = openai.Completion.create(
+        model="text-davinci-004",
+        prompt=conversation,
+        max_tokens=100
+    )
+    return response.choices[0].text.strip()
 
 @router.message(Command('start'))
 async def cmd_start(message: types.Message):
