@@ -2,10 +2,14 @@ import os
 import logging
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+# from aiogram.contrib.fsm_storage.memory import MemoryStorage
+# from aiogram.dispatcher import FSMContext
+# from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.filters.state import StatesGroup, State
 from aiogram.utils import executor
+
 from transformers import AutoModelForChat, AutoTokenizer
 
 load_dotenv()
