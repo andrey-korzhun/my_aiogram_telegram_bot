@@ -85,49 +85,33 @@ def handle_message(message):
     # Добавляем сообщение пользователя в историю
     user_dialogs[user_id].append({"role": "user", "content": message.text})
 
-    if generating_story:
-        # Генерируем сказку
-        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
+    # Генерируем ответ ChatGPT
+    chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
 
-        # Отправляем сказку пользователю
-        bot.send_message(user_id, chatgpt_response)
+    # Добавляем ответ ChatGPT в историю
+    user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
 
-        # Отправляем сообщение о том, что сказку можно отправить партнеру
-        bot.send_message(user_id, "Эту сказку вы можете отправить своему партнеру, чтобы поднять настроение.")
+    # Отправляем ответ ChatGPT пользователю
+    bot.send_message(user_id, chatgpt_response)
 
-        # Сбрасываем флаг generating_story
-        generating_story = False
-
+    # Проверяем количество ответов пользователя
+    if len(user_dialogs[user_id]) >= 15:
         # Очищаем историю диалога
         user_dialogs[user_id] = []
-    else:
-        # Генерируем ответ ChatGPT
-        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
+        # Создаем кнопки
+        markup = telebot.types.InlineKeyboardMarkup()
+        btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
+        btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://t.me/Dr_Haifisch")
+        btn3 = telebot.types.InlineKeyboardButton("Создать сказку!", callback_data="continue")
+        markup.add(btn1, btn2, btn3)
 
-        # Добавляем ответ ChatGPT в историю
-        user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
-
-        # Отправляем ответ ChatGPT пользователю
-        bot.send_message(user_id, chatgpt_response)
-
-        # Проверяем количество ответов пользователя
-        if len(user_dialogs[user_id]) >= 15:
-            # Очищаем историю диалога
-            user_dialogs[user_id] = []
-            # Создаем кнопки
-            markup = telebot.types.InlineKeyboardMarkup()
-            btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
-            btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://t.me/Dr_Haifisch")
-            btn3 = telebot.types.InlineKeyboardButton("Создать сказку!", callback_data="continue")
-            markup.add(btn1, btn2, btn3)
-
-            # Отправляем кнопки пользователю
-            bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
+        # Отправляем кнопки пользователю
+        bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
 
 # Обработчик нажатия кнопки "Создать сказку!"
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    global prompt, generating_story
+    global prompt
     user_id = call.from_user.id
 
     if call.data == "continue":
@@ -146,8 +130,6 @@ def callback_query(call):
         7. “Какой антураж для сказки ты выберешь? Древний Египет, Эпоху просвещения в европе, Настоящее время или далекое будущее? Если что-то другое или более конкретное - назови свой вариант.”
         Задай первый вопрос: “Как зовут тебя и твоего партнера?” и получи на него ответ. Получай ответ от человека, не придумывай сама. Не задавай следующий вопрос, пока не получишь на ответ от клиента на текущий вопрос. После получения ответа на 7 указанных вопросов - сгенерируй сказку.
         """
-        # Устанавливаем флаг generating_story
-        generating_story = True
 
         # Отправляем первый вопрос для составления сказки
         bot.send_message(user_id, "Как зовут тебя и твоего партнера?")
