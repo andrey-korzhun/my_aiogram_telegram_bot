@@ -77,11 +77,8 @@ def handle_message(message):
         bot.send_message(user_id, "Для начала диалога введите /start")
         return
 
-    # Добавляем сообщение пользователя в историю
-    user_dialogs[user_id].append({"role": "user", "content": message.text})
-
     # Проверяем количество ответов пользователя
-    if len(user_dialogs[user_id]) <= 14:
+    if len(user_dialogs[user_id]) <= 15:
         # Генерируем ответ ChatGPT
         chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
 
@@ -90,6 +87,9 @@ def handle_message(message):
 
         # Отправляем ответ ChatGPT пользователю
         bot.send_message(user_id, chatgpt_response)
+
+        # Добавляем сообщение пользователя в историю
+        user_dialogs[user_id].append({"role": "user", "content": message.text})
     else:
         # Вэтом месте очищаем историю диалога
         user_dialogs[user_id] = []
@@ -127,12 +127,6 @@ def callback_query(call):
 
         После генерации сказки отправь следующим, отдельным сообщением информацию о том, что эту сказку клиент может послать партнеру, чтобы поднять настроение. 
         """
-
-        # # Генерируем 7 вопросов от ChatGPT
-        # # for _ in range(7):
-        # chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
-        # user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
-        # bot.send_message(user_id, chatgpt_response)
 
 # Запуск бота
 bot.polling()
