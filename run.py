@@ -52,7 +52,7 @@ def start(message):
     user_dialogs[user_id] = []
     
     # Задаем начальный промпт
-    initial_prompt = "Привет! Давай поболтаем. Расскажи мне о своем любимом хобби."
+    initial_prompt = "Как долго вы вместе и какие вы видите проблемы в ваших отношениях?"
     
     # Отправляем первый вопрос
     bot.send_message(user_id, initial_prompt)
@@ -92,8 +92,8 @@ def handle_message(message):
     else:
         # Создаем кнопки
         markup = telebot.types.InlineKeyboardMarkup()
-        btn1 = telebot.types.InlineKeyboardButton("Оплатить", url="https://www.google.com")
-        btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://www.yandex.ru")
+        btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
+        btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://t.me/Dr_Haifisch")
         btn3 = telebot.types.InlineKeyboardButton("Создать сказку!", callback_data="continue")
         markup.add(btn1, btn2, btn3)
 
