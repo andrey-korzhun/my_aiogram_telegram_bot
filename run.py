@@ -71,7 +71,7 @@ def handle_message(message):
     user_dialogs[user_id].append({"role": "user", "content": message.text})
 
     # Проверяем количество ответов пользователя
-    if len(user_dialogs[user_id]) <= 8:
+    if len(user_dialogs[user_id]) <= 16:
         # Генерируем ответ ChatGPT
         prompt = """
         Привет Софи! Ты семейный психолог с 15-ти летним стажем работы.
@@ -90,6 +90,7 @@ def handle_message(message):
         # Отправляем ответ ChatGPT пользователю
         bot.send_message(user_id, chatgpt_response)
     else:
+        user_dialogs[user_id] = []
         # Создаем кнопки
         markup = telebot.types.InlineKeyboardMarkup()
         btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
@@ -125,10 +126,10 @@ def callback_query(call):
         """
 
         # Генерируем 7 вопросов от ChatGPT
-        for _ in range(7):
-            chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
-            user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
-            bot.send_message(user_id, chatgpt_response)
+        # for _ in range(7):
+        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
+        user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
+        bot.send_message(user_id, chatgpt_response)
 
 # Запуск бота
 bot.polling()
