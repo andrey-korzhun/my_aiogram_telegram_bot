@@ -107,7 +107,7 @@ def handle_message(message):
 # Обработчик нажатия кнопки "Продолжить диалог"
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    user_id = call.from_user.id
+    
 
     if call.data == "continue":
         # Устанавливаем новый промпт
@@ -128,6 +128,7 @@ def callback_query(call):
 
         После генерации сказки отправь следующим, отдельным сообщением информацию о том, что эту сказку клиент может послать партнеру, чтобы поднять настроение. 
         """
+        call.data == ""
 
 # Запуск бота
 bot.polling()
