@@ -79,6 +79,9 @@ def handle_message(message):
 
     # Проверяем количество ответов пользователя
     if len(user_dialogs[user_id]) <= 15:
+        # Добавляем сообщение пользователя в историю
+        user_dialogs[user_id].append({"role": "user", "content": message.text})
+
         # Генерируем ответ ChatGPT
         chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
 
@@ -87,9 +90,6 @@ def handle_message(message):
 
         # Отправляем ответ ChatGPT пользователю
         bot.send_message(user_id, chatgpt_response)
-
-        # Добавляем сообщение пользователя в историю
-        user_dialogs[user_id].append({"role": "user", "content": message.text})
     else:
         # Вэтом месте очищаем историю диалога
         user_dialogs[user_id] = []
