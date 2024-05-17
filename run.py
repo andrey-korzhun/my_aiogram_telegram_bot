@@ -71,7 +71,7 @@ def handle_message(message):
     user_dialogs[user_id].append({"role": "user", "content": message.text})
 
     # Проверяем количество ответов пользователя
-    if len(user_dialogs[user_id]) <= 16:
+    if len(user_dialogs[user_id]) <= 15:
         # Генерируем ответ ChatGPT
         prompt = """
         Привет Софи! Ты семейный психолог с 15-ти летним стажем работы.
