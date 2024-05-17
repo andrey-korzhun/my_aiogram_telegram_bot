@@ -26,10 +26,13 @@ user_dialogs = {}
 # Ограничение по username (замените на список username)
 restricted_users = ["username1", "username2"]
 
+# Флаг для отслеживания этапа диалога
+generating_story = False
+
 # Функция для генерации ответа ChatGPT
 def generate_chatgpt_response(prompt, conversation_history):
     response = openai.ChatCompletion.create(
-        model="gpt-4o",
+        model="gpt-4",
         messages=[
             {"role": "system", "content": prompt},
             *conversation_history
@@ -71,6 +74,7 @@ def start(message):
 # Обработчик текстовых сообщений
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
+    global generating_story
     user_id = message.from_user.id
 
     # Проверка на наличие диалога
@@ -81,37 +85,53 @@ def handle_message(message):
     # Добавляем сообщение пользователя в историю
     user_dialogs[user_id].append({"role": "user", "content": message.text})
 
-    # Генерируем ответ ChatGPT
-    chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
+    if generating_story:
+        # Генерируем сказку
+        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
 
-    # Добавляем ответ ChatGPT в историю
-    user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
+        # Отправляем сказку пользователю
+        bot.send_message(user_id, chatgpt_response)
 
-    # Отправляем ответ ChatGPT пользователю
-    bot.send_message(user_id, chatgpt_response)
+        # Отправляем сообщение о том, что сказку можно отправить партнеру
+        bot.send_message(user_id, "Эту сказку вы можете отправить своему партнеру, чтобы поднять настроение.")
 
-    # Проверяем количество ответов пользователя
-    if len(user_dialogs[user_id]) >= 15:
-        # Вэтом месте очищаем историю диалога
+        # Сбрасываем флаг generating_story
+        generating_story = False
+
+        # Очищаем историю диалога
         user_dialogs[user_id] = []
-        # Создаем кнопки
-        markup = telebot.types.InlineKeyboardMarkup()
-        btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
-        btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://t.me/Dr_Haifisch")
-        btn3 = telebot.types.InlineKeyboardButton("Создать сказку!", callback_data="continue")
-        markup.add(btn1, btn2, btn3)
+    else:
+        # Генерируем ответ ChatGPT
+        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
 
-        # Отправляем кнопки пользователю
-        bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
+        # Добавляем ответ ChatGPT в историю
+        user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
 
-# Обработчик нажатия кнопки "Продолжить диалог"
+        # Отправляем ответ ChatGPT пользователю
+        bot.send_message(user_id, chatgpt_response)
+
+        # Проверяем количество ответов пользователя
+        if len(user_dialogs[user_id]) >= 15:
+            # Очищаем историю диалога
+            user_dialogs[user_id] = []
+            # Создаем кнопки
+            markup = telebot.types.InlineKeyboardMarkup()
+            btn1 = telebot.types.InlineKeyboardButton("ОПЛАТИТЬ", url='https://tinyurl.com/paysofi')
+            btn2 = telebot.types.InlineKeyboardButton("Написать отзыв", url="https://t.me/Dr_Haifisch")
+            btn3 = telebot.types.InlineKeyboardButton("Создать сказку!", callback_data="continue")
+            markup.add(btn1, btn2, btn3)
+
+            # Отправляем кнопки пользователю
+            bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
+
+# Обработчик нажатия кнопки "Создать сказку!"
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    
+    global prompt, generating_story
+    user_id = call.from_user.id
 
     if call.data == "continue":
         # Устанавливаем новый промпт
-        global prompt 
         prompt = """
         Софи, ты семейный психолог с 15-ти летним стажем работы. К тебе на прием пришел клиент, который хочет сохранить отношения. Для того, чтобы вернуть приятные воспоминания о встрече клиенту и партнеру клиента, напиши сказку том как клиент и его партнер встретились. Если клиент мужчина, то его партнер девушка. Если клиент девушка, то ее партнер мужчина. 
         Сказка должна содержать три блока. Первый блок - время до встречи друг с другом. В этом блоке можно немного пофантазировать чем могли бы заниматься герои истории в рамках выбранной темы и вселенной. Важно отметить, что в первом блоке они еще не познали истинного счастья, так как не встретились. Второй блок - встреча. В этом блоке расскажи как они встретились, несмотря на все невзгоды и сразу поняли, что что-то испытывают друг к другу. Второй блок самый объемный по тексту, добавь сюда все детали, которые укажет клиент. Если детали не соответствуют вселенной или тематике, постарайся их адаптировать, чтобы они гармонично вписались. Третий блок - их будущее. В блоке важно указать, что пару ждало еще много испытаний, но, пока они вместе, они постараются преодолеть все невзгоды. 
@@ -125,10 +145,12 @@ def callback_query(call):
         6. “Кем работает твой партнер и чем любит заниматься?” (Если клиент назвал имя партнера, используй в вопросе названное имя партнера, вместо обезличенного обращения “Партнер”)
         7. “Какой антураж для сказки ты выберешь? Древний Египет, Эпоху просвещения в европе, Настоящее время или далекое будущее? Если что-то другое или более конкретное - назови свой вариант.”
         Задай первый вопрос: “Как зовут тебя и твоего партнера?” и получи на него ответ. Получай ответ от человека, не придумывай сама. Не задавай следующий вопрос, пока не получишь на ответ от клиента на текущий вопрос. После получения ответа на 7 указанных вопросов - сгенерируй сказку.
-
-        После генерации сказки отправь следующим, отдельным сообщением информацию о том, что эту сказку клиент может послать партнеру, чтобы поднять настроение. 
         """
-        call.data == ""
+        # Устанавливаем флаг generating_story
+        generating_story = True
+
+        # Отправляем первый вопрос для составления сказки
+        bot.send_message(user_id, "Как зовут тебя и твоего партнера?")
 
 # Запуск бота
 bot.polling()
