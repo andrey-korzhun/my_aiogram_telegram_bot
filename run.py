@@ -76,21 +76,21 @@ def handle_message(message):
     if user_id not in user_dialogs:
         bot.send_message(user_id, "Для начала диалога введите /start")
         return
+    
+    # Добавляем сообщение пользователя в историю
+    user_dialogs[user_id].append({"role": "user", "content": message.text})
+
+    # Генерируем ответ ChatGPT
+    chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
+
+    # Добавляем ответ ChatGPT в историю
+    user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
+
+    # Отправляем ответ ChatGPT пользователю
+    bot.send_message(user_id, chatgpt_response)
 
     # Проверяем количество ответов пользователя
-    if len(user_dialogs[user_id]) <= 15:
-        # Добавляем сообщение пользователя в историю
-        user_dialogs[user_id].append({"role": "user", "content": message.text})
-
-        # Генерируем ответ ChatGPT
-        chatgpt_response = generate_chatgpt_response(prompt, user_dialogs[user_id])
-
-        # Добавляем ответ ChatGPT в историю
-        user_dialogs[user_id].append({"role": "assistant", "content": chatgpt_response})
-
-        # Отправляем ответ ChatGPT пользователю
-        bot.send_message(user_id, chatgpt_response)
-    else:
+    if len(user_dialogs[user_id]) >= 15:
         # Вэтом месте очищаем историю диалога
         user_dialogs[user_id] = []
         # Создаем кнопки
