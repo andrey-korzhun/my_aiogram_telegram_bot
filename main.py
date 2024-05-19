@@ -6,17 +6,13 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.filters import Command
+import openai
 import asyncio
-
-from openai import AsyncOpenAI
 
 # Загрузка переменных окружения
 load_dotenv()
 TG_TOKEN = os.getenv('TG_TOKEN')
 AI_TOKEN = os.getenv('AI_TOKEN')
-
-# Инициализация OpenAI
-client = AsyncOpenAI(api_key=AI_TOKEN)
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +23,9 @@ bot = Bot(token=TG_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML
 
 # Инициализация диспетчера
 dp = Dispatcher()
+
+# Инициализация OpenAI
+openai.api_key = AI_TOKEN
 
 # Словарь для хранения истории диалогов пользователей
 user_dialogs = {}
@@ -77,7 +76,7 @@ pay_text = """
 
 # Функция для генерации ответа ChatGPT
 async def generate_chatgpt_response(prompt, conversation_history):
-    response = await client.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": prompt},
