@@ -1,35 +1,37 @@
 import os
 import logging
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.client.bot import DefaultBotProperties
 from aiogram.filters import Command
-from aiogram import F
-import openai
+import asyncio
+
+from openai import AsyncOpenAI
 
 # Загрузка переменных окружения
 load_dotenv()
 TG_TOKEN = os.getenv('TG_TOKEN')
 AI_TOKEN = os.getenv('AI_TOKEN')
 
+# Инициализация OpenAI
+client = AsyncOpenAI(api_key=AI_TOKEN)
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Инициализация бота
-bot = Bot(token=TG_TOKEN, parse_mode=ParseMode.HTML)
+# Инициализация бота (используем новейший способ parse_mode)
+bot = Bot(token=TG_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Инициализация диспетчера
 dp = Dispatcher()
 
-# Инициализация OpenAI
-openai.api_key = AI_TOKEN
-
 # Словарь для хранения истории диалогов пользователей
 user_dialogs = {}
 
-# Ограничение по username (замените на список username)
+# Ограничение по username (можно временно использовать для ограничения неоплат)
 restricted_users = ["username1", "username2"]
 
 # Количество вопросов (для отладки ставим меньше)
@@ -44,15 +46,6 @@ prompt = f'''
 Получай ответ от человека, не придумывай сама. Следующий вопрос задай основываясь на предыдущем вопросе.
 Не задавай следующий вопрос, пока не получишь на него ответ от клиента.
 Первый вопрос уже задан. Вопрос звучит как: "Как долго вы вместе и какие вы сложности есть в ваших отношениях?".
-'''
-
-temp = '''
-Если ответ клиента на твой вопрос очень короткий и в нем недостаточно информации для анализа - задай уточняющий вопрос, используя доброжелательные формулировки.
-Только после получения полноценного ответа на вопрос переходи к следующему из списка {n_questions} вопросов.
-Если человек не хочет отвечать на какой-то вопрос - постарайся убедить его, используя добродушные и мягкие формулировки.
-Напомни ему, что это важно для дальнейшей терапии клиента и вся информация, которую дает клиент остается засекреченной.
-Если на твой вопрос клиент дает ответы, которые по смыслу похожи на формулировки "Я не знаю" или "Понятия не имею" - не иди дальше по списку вопросов - попробуй еще раз задать этот вопрос, уточнив вопрос и используя добродушные и мягкие формулировки.
-Если на повторный вопрос клиент снова даст похожий ответ - поддержи клиента и иди дальше по вопросам.
 '''
 
 finalize = '''
@@ -84,8 +77,8 @@ pay_text = """
 
 # Функция для генерации ответа ChatGPT
 async def generate_chatgpt_response(prompt, conversation_history):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
+    response = await client.chat.completions.create(
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": prompt},
             *conversation_history
@@ -93,8 +86,12 @@ async def generate_chatgpt_response(prompt, conversation_history):
     )
     return response.choices[0].message['content'].strip()
 
+# Добавляем роутер
+router = Router()
+dp.include_router(router)
+
 # Обработчик команды /start
-@dp.message_handler(Command(commands=['start']))
+@router.message(Command(commands=['start']))
 async def start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -117,7 +114,7 @@ async def start(message: types.Message):
     user_dialogs[user_id].append({"role": "assistant", "content": initial_prompt})
 
 # Обработчик текстовых сообщений
-@dp.message_handler()
+@router.message()
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
 
@@ -129,6 +126,7 @@ async def handle_message(message: types.Message):
     # Добавляем сообщение пользователя в историю
     user_dialogs[user_id].append({"role": "user", "content": message.text})
 
+    # Проверка на общее количество сообщений
     if len(user_dialogs[user_id]) >= ((n_questions * 2) - 1):
         # Генерируем финальный ответ ChatGPT
         chatgpt_response = await generate_chatgpt_response(finalize, user_dialogs[user_id])
@@ -160,12 +158,11 @@ async def handle_message(message: types.Message):
         await message.answer(chatgpt_response)
 
 # Обработчик нажатия кнопки "Создать сказку!"
-@dp.callback_query_handler(lambda c: c.data == "continue")
+@router.callback_query(lambda c: c.data == "continue")
 async def callback_query(call: types.CallbackQuery):
     global prompt, finalize, pay_text, user_dialogs
     user_id = call.from_user.id
 
-    # Устанавливаем новый промпт
     prompt = """
     Софи, ты семейный психолог с 15-ти летним стажем работы. К тебе на прием пришел клиент, который хочет сохранить отношения.
     Для того, чтобы вернуть приятные воспоминания о встрече клиенту и партнеру клиента, напиши сказку том как клиент и его партнер встретились.
@@ -182,7 +179,6 @@ async def callback_query(call: types.CallbackQuery):
     7. “Какой антураж для сказки ты выберешь? Древний Египет, Эпоху просвещения в европе, Каменный век или далекое будущее? Если что-то другое или более конкретное - назови свой вариант.”
     Начни с приветственной фразой и задай первый вопрос: “Как зовут тебя и твоего партнера?” и получи на него ответ. Получай ответ от человека, не придумывай сама. Не задавай следующий вопрос, пока не получишь на ответ от клиента на текущий вопрос.
     """
-    # После генерации сказки отправь следующим, отдельным сообщением информацию о том, что эту сказку клиент может послать партнеру, чтобы поднять настроение.
 
     finalize = '''
     Софи, ты семейный психолог с 15-ти летним стажем работы. К тебе на прием пришел клиент, который хочет сохранить отношения.
@@ -213,7 +209,13 @@ async def callback_query(call: types.CallbackQuery):
     # Добавляем первый вопрос в историю
     user_dialogs[user_id].append({"role": "assistant", "content": first_question})
 
+async def main():
+    await dp.start_polling(bot, skip_updates=True)
+
 # Запуск бота
 if __name__ == '__main__':
-    from aiogram import run
-    run(dp, bot, skip_updates=True)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print('Exit')
+

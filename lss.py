@@ -6,20 +6,22 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.filters import Command
-import openai
 import asyncio
+
+from openai import AsyncOpenAI
+
 
 load_dotenv()
 TG_TOKEN = os.getenv('TG_TOKEN')
 AI_TOKEN = os.getenv('AI_TOKEN')
+
+client = AsyncOpenAI(api_key=AI_TOKEN)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bot = Bot(token=TG_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
-
-openai.api_key = AI_TOKEN
 
 user_dialogs = {}
 
@@ -41,8 +43,8 @@ pay_text = """
 """
 
 async def generate_chatgpt_response(prompt, conversation_history):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
+    response = await client.chat.completions.create(
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": prompt},
             *conversation_history
@@ -133,4 +135,3 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print('Exit')
-
